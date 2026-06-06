@@ -1,0 +1,17 @@
+#EDITOR
+**/.editorconfig
+**/.vscode
+
+#github
+**/.github/**
+
+#LOGS
+**/*.log
+
+#ENVs
+**/.env.*
+
+#VENVs
+**/venv
+**/env
+**/.env
