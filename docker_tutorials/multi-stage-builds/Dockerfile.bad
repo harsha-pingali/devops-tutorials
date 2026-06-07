@@ -1,0 +1,12 @@
+FROM ubuntu:latest
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends golang
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o timer .
+
+ENTRYPOINT [ "/app/timer" ]
