@@ -1,0 +1,45 @@
+[[metric]]
+context = "slow_queries"
+labels = ["sql_id", "username", "program","sql_text"]
+metricsdesc = { elapsed_time_seconds = "SQL execution elapsed time in seconds", executions = "Number of executions", cpu_time_seconds = "CPU time in seconds", disk_reads = "Number of disk reads" }
+
+request = """
+SELECT
+  sql_id,
+  COALESCE(parsing_schema_name, 'UNKNOWN') as username,
+  COALESCE(module, 'UNKNOWN') as program,
+  SUBSTR(REPLACE(sql_text, CHR(10), ' '), 1, 200) as sql_text,  
+  elapsed_time / 1000000 as elapsed_time_seconds,
+  executions,
+  cpu_time / 1000000 as cpu_time_seconds,
+  disk_reads
+FROM
+  v$sqlarea
+WHERE
+  elapsed_time > 10000000
+  AND executions > 0
+ORDER BY
+  elapsed_time DESC
+FETCH FIRST 20 ROWS ONLY
+"""
+
+[[metric]]
+context = "long_running_sessions"
+labels = ["sid", "username", "status", "machine"]
+metricsdesc = { seconds_in_wait = "Seconds session has been waiting", blocking_session = "Session ID of blocking session (0 if none)" }
+
+request = """
+SELECT
+  s.sid,
+  COALESCE(s.username, 'SYSTEM') as username,
+  s.status,
+  COALESCE(s.machine, 'UNKNOWN') as machine,
+  s.seconds_in_wait,
+  COALESCE(s.blocking_session, 0) as blocking_session
+FROM
+  v$session s
+WHERE
+  s.status = 'ACTIVE'
+  AND s.type = 'USER'
+  AND s.seconds_in_wait > 30
+"""

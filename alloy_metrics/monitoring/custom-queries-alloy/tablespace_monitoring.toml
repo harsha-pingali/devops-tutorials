@@ -1,0 +1,36 @@
+[[metric]]
+context = "tablespace_usage"
+labels = ["tablespace_name", "contents"]
+metricsdesc = { size_bytes = "Total tablespace size in bytes", used_bytes = "Used space in bytes", free_bytes = "Free space in bytes", percent_used = "Percentage of space used" }
+
+request = """
+SELECT
+  tablespace_name,
+  contents,
+  tablespace_size * 8192 AS size_bytes,
+  used_space * 8192 AS used_bytes,
+  (tablespace_size - used_space) * 8192 AS free_bytes,
+  used_percent AS percent_used
+FROM
+  dba_tablespace_usage_metrics
+"""
+
+[[metric]]
+context = "tablespace_files"
+labels = ["tablespace_name", "file_name", "autoextensible"]
+metricsdesc = { bytes = "Current file size in bytes", maxbytes = "Maximum file size in bytes", user_bytes = "User data size in bytes" }
+
+request = """
+SELECT
+  tablespace_name,
+  file_name,
+  TO_CHAR(autoextensible) AS autoextensible,
+  bytes,
+  CASE
+    WHEN maxbytes = 0 THEN bytes
+    ELSE maxbytes
+  END AS maxbytes,
+  user_bytes
+FROM
+  dba_data_files
+"""

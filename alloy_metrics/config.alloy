@@ -1,0 +1,125 @@
+// ============================================
+// ALLOY CONFIGURATION FILE
+// Oracle DB Monitoring with Custom Metrics
+// ============================================
+
+// Self-monitoring: Alloy metrics
+prometheus.exporter.self "integrations_alloy" {}
+
+discovery.relabel "integrations_alloy" {
+  targets = prometheus.exporter.self.integrations_alloy.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "integrations/alloy"
+  }
+}
+
+prometheus.scrape "integrations_alloy" {
+  targets    = discovery.relabel.integrations_alloy.output
+  forward_to = [prometheus.remote_write.integrations_infra.receiver]
+  job_name   = "integrations/alloy"
+}
+
+// ============================================
+// Node Exporter: System metrics
+// ============================================
+
+prometheus.exporter.unix "integrations_node_exporter" {}
+
+discovery.relabel "integrations_node_exporter" {
+  targets = prometheus.exporter.unix.integrations_node_exporter.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "integrations/node_exporter"
+  }
+
+  rule {
+    target_label = "instance"
+    replacement  = "172.27.35.52"
+  }
+}
+
+prometheus.scrape "integrations_node_exporter" {
+  targets    = discovery.relabel.integrations_node_exporter.output
+  forward_to = [prometheus.remote_write.integrations_infra.receiver]
+  job_name   = "integrations/node_exporter"
+}
+
+// ============================================
+// Oracle DB Exporter
+// ============================================
+
+prometheus.exporter.oracledb "integrations_oracledb" {
+  connection_string = "oracle://PSR_ALPHAQA:PSR_ALPHAQA@172.27.35.52:1521/PSRAML_PDB1?externalAuth=no" 
+
+ custom_metrics = [
+    "/home/psr/monitoring/custom-queries-alloy/slow_queries.toml",
+    "/home/psr/monitoring/custom-queries-alloy/tablespace_monitoring.toml",
+    "/home/psr/monitoring/custom-queries-alloy/session_monitoring.toml",
+    "/home/psr/monitoring/custom-queries-alloy/performance_metrics.toml",
+  ]
+
+  max_open_conns = 10
+  max_idle_conns = 5
+  query_timeout  = 30
+}
+
+discovery.relabel "integrations_oracledb" {
+  targets = prometheus.exporter.oracledb.integrations_oracledb.targets
+
+  rule {
+    target_label = "instance"
+    replacement  = "172.27.35.52"
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "integrations/oracledb"
+  }
+
+  rule {
+    target_label = "database_type"
+    replacement  = "oracle"
+  }
+
+  rule {
+    target_label = "monitoring_type"
+    replacement  = "database_metrics"
+  }
+}
+
+prometheus.scrape "integrations_oracledb" {
+  targets         = discovery.relabel.integrations_oracledb.output
+  forward_to      = [prometheus.remote_write.integrations_infra.receiver]
+  job_name        = "integrations/oracledb"
+  scrape_interval = "5m"
+  scrape_timeout  = "2m"
+}
+
+// ============================================
+// Remote Write Endpoint
+// ============================================
+
+prometheus.remote_write "integrations_infra" {
+  endpoint {
+    url = "http://172.27.35.90:9009/api/v1/push"
+
+    headers = {
+      "x-scope-orgid" = "azentio-infra",
+    }
+
+    queue_config {
+      capacity             = 10000
+      max_shards           = 50
+      min_shards           = 1
+      max_samples_per_send = 5000
+      batch_send_deadline  = "5s"
+      min_backoff          = "30ms"
+      max_backoff          = "5s"
+    }
+
+    metadata_config {}
+  }
+}

@@ -1,0 +1,61 @@
+[[metric]]
+context = "active_sessions"
+labels = ["status", "machine", "program"]
+metricsdesc = { session_count = "Number of sessions by status and program" }
+
+request = """
+SELECT
+status,
+COALESCE(machine, 'UNKNOWN') AS machine,
+COALESCE(program, 'UNKNOWN') AS program,
+COUNT(*) AS session_count
+FROM
+v$session
+WHERE
+type = 'USER'
+GROUP BY
+status,
+machine,
+program
+"""
+
+[[metric]]
+context = "blocking_sessions"
+labels = ["blocking_session", "blocked_session", "username", "wait_class"]
+metricsdesc = { wait_time_seconds = "Time blocked session has been waiting in seconds", sessions_blocked = "Number of sessions being blocked" }
+
+request = """
+SELECT
+TO_CHAR(blocking_session) AS blocking_session,
+TO_CHAR(sid) AS blocked_session,
+COALESCE(username, 'UNKNOWN') AS username,
+COALESCE(wait_class, 'UNKNOWN') AS wait_class,
+seconds_in_wait AS wait_time_seconds,
+1 AS sessions_blocked
+FROM
+v$session
+WHERE
+blocking_session IS NOT NULL
+AND blocking_session_status = 'VALID'
+"""
+
+[[metric]]
+context = "session_waits"
+labels = ["wait_class", "event"]
+metricsdesc = { total_waits = "Total number of wait events", time_waited_seconds = "Total time waited in seconds" }
+
+request = """
+SELECT
+wait_class,
+event,
+total_waits,
+ROUND(time_waited / 100, 2) AS time_waited_seconds
+FROM
+v$system_event
+WHERE
+wait_class <> 'Idle'
+AND total_waits > 0
+ORDER BY
+time_waited DESC
+FETCH FIRST 30 ROWS ONLY
+"""

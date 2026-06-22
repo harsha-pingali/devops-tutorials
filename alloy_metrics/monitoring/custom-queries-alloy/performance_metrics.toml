@@ -1,0 +1,78 @@
+[[metric]]
+context = "buffer_cache_hit_ratio"
+labels = []
+metricsdesc = { hit_ratio_percent = "Buffer cache hit ratio percentage" }
+
+request = """
+SELECT
+  ROUND((1 - (phy.value / (db.value + consistent.value))) * 100, 2) AS hit_ratio_percent
+FROM
+  v$sysstat phy,
+  v$sysstat db,
+  v$sysstat consistent
+WHERE
+  phy.name = 'physical reads'
+  AND db.name = 'db block gets'
+  AND consistent.name = 'consistent gets'
+  AND (db.value + consistent.value) > 0
+"""
+
+
+[[metric]]
+context = "sga_memory"
+labels = ["pool", "name"]
+metricsdesc = { bytes = "SGA memory pool size in bytes" }
+
+request = """
+SELECT
+  pool,
+  name,
+  bytes
+FROM
+  v$sgastat
+WHERE
+  pool IS NOT NULL
+  AND bytes > 0
+"""
+
+
+[[metric]]
+context = "pga_memory"
+labels = []
+metricsdesc = { pga_target_bytes = "PGA aggregate target in bytes", pga_allocated_bytes = "PGA currently allocated in bytes", pga_used_bytes = "PGA currently used in bytes" }
+
+request = """
+SELECT
+  SUM(CASE WHEN name = 'aggregate PGA target parameter' THEN value ELSE 0 END) AS pga_target_bytes,
+  SUM(CASE WHEN name = 'total PGA allocated' THEN value ELSE 0 END) AS pga_allocated_bytes,
+  SUM(CASE WHEN name = 'total PGA inuse' THEN value ELSE 0 END) AS pga_used_bytes
+FROM
+  v$pgastat
+WHERE
+  name IN (
+    'aggregate PGA target parameter',
+    'total PGA allocated',
+    'total PGA inuse'
+  )
+"""
+
+
+[[metric]]
+context = "redo_log_stats"
+labels = []
+metricsdesc = { redo_size_bytes = "Redo size in bytes", redo_writes = "Number of redo writes", redo_blocks_written = "Number of redo blocks written" }
+
+request = """
+SELECT
+  SUM(CASE WHEN name = 'redo size' THEN value ELSE 0 END) AS redo_size_bytes,
+  SUM(CASE WHEN name = 'redo writes' THEN value ELSE 0 END) AS redo_writes,
+  SUM(CASE WHEN name = 'redo blocks written' THEN value ELSE 0 END) AS redo_blocks_written
+FROM
+  v$sysstat
+WHERE
+  name IN (
+    'redo size',
+    'redo writes',
+    'redo blocks written'
+  )
+"""
